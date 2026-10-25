@@ -16,17 +16,16 @@ export async function GET(request: Request) {
   const fechaHasta = searchParams.get('fechaHasta');
   const fuente = searchParams.get('fuente');
 
-  const farmaciaId =
+  let farmaciaId =
     user.rol === 'ADMIN_CENTRAL' && requestedFarmaciaId
       ? requestedFarmaciaId
       : user.farmaciaId;
 
-  if (!farmaciaId) {
-    return NextResponse.json({ error: 'Farmacia no definida' }, { status: 400 });
-  }
-
   try {
-    const where: any = { farmaciaId };
+    const where: any = {};
+    if (farmaciaId) {
+      where.farmaciaId = farmaciaId;
+    }
 
     if (tipoAtencion) {
       where.tipoAtencion = tipoAtencion;
@@ -96,7 +95,12 @@ export async function POST(request: Request) {
     } = body;
 
     // 1. Determinar farmacia del usuario
-    const farmaciaId = user.rol === 'ADMIN_CENTRAL' && body.farmaciaId ? body.farmaciaId : user.farmaciaId;
+    let farmaciaId = user.rol === 'ADMIN_CENTRAL' && body.farmaciaId ? body.farmaciaId : user.farmaciaId;
+    if (!farmaciaId && user.rol === 'ADMIN_CENTRAL') {
+      const primera = await prisma.farmacia.findFirst({ where: { activo: true }, orderBy: { codigoFarmacia: 'asc' } });
+      farmaciaId = primera?.id || null;
+    }
+
     if (!farmaciaId) {
       return NextResponse.json({ error: 'Debe especificar la farmacia de emisión' }, { status: 400 });
     }

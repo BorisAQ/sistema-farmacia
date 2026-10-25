@@ -16,10 +16,18 @@ export async function GET(request: Request) {
   const personaId = searchParams.get('personaId');
   const requestedFarmaciaId = searchParams.get('farmaciaId');
 
-  const farmaciaId =
+  let farmaciaId =
     user.rol === 'ADMIN_CENTRAL' && requestedFarmaciaId
       ? requestedFarmaciaId
       : user.farmaciaId;
+
+  if (!farmaciaId && user.rol === 'ADMIN_CENTRAL') {
+    const primera = await prisma.farmacia.findFirst({
+      where: { activo: true },
+      orderBy: { codigoFarmacia: 'asc' },
+    });
+    farmaciaId = primera?.id || null;
+  }
 
   if (!farmaciaId) {
     return NextResponse.json({ error: 'Farmacia no definida' }, { status: 400 });
@@ -65,11 +73,8 @@ export async function GET(request: Request) {
       orderBy: { fecha: 'asc' },
     });
 
-    // Filtrar recetas que contengan detalles para la fuente seleccionada
     const recetasFiltradas = recetas.filter((r) => r.detalles.length > 0);
 
-    // Agrupar filas para el reporte detallado
-    // Formato requerido: Fecha, Nombre Paciente, Matrícula, Tipo Atención, Nombre Genérico, Nombre Comercial, Liname, Concentración, Presentación, Cantidad, Costo Unitario, Costo Total
     const itemsReporte: any[] = [];
     let costoTotalGeneral = 0;
 

@@ -14,10 +14,19 @@ export async function GET(request: Request) {
   const requestedFarmaciaId = searchParams.get('farmaciaId');
 
   // Aislamiento por farmacia: si no es ADMIN_CENTRAL, siempre usa su farmaciaId asignada
-  const farmaciaId =
+  let farmaciaId =
     user.rol === 'ADMIN_CENTRAL' && requestedFarmaciaId
       ? requestedFarmaciaId
       : user.farmaciaId;
+
+  // Si es ADMIN_CENTRAL y no especificó farmacia, tomar la primera farmacia por defecto
+  if (!farmaciaId && user.rol === 'ADMIN_CENTRAL') {
+    const primera = await prisma.farmacia.findFirst({
+      where: { activo: true },
+      orderBy: { codigoFarmacia: 'asc' },
+    });
+    farmaciaId = primera?.id || null;
+  }
 
   if (!farmaciaId) {
     return NextResponse.json({ error: 'Debe especificar una farmacia' }, { status: 400 });
@@ -62,7 +71,12 @@ export async function POST(request: Request) {
 
   try {
     const data = await request.json();
-    const farmaciaId = user.rol === 'ADMIN_CENTRAL' && data.farmaciaId ? data.farmaciaId : user.farmaciaId;
+    let farmaciaId = user.rol === 'ADMIN_CENTRAL' && data.farmaciaId ? data.farmaciaId : user.farmaciaId;
+
+    if (!farmaciaId && user.rol === 'ADMIN_CENTRAL') {
+      const primera = await prisma.farmacia.findFirst({ where: { activo: true } });
+      farmaciaId = primera?.id || null;
+    }
 
     if (!farmaciaId) {
       return NextResponse.json({ error: 'Farmacia no especificada' }, { status: 400 });

@@ -16,6 +16,7 @@ import {
   Printer,
   ChevronRight,
   Filter,
+  Building2,
 } from 'lucide-react';
 
 interface Paciente {
@@ -50,6 +51,10 @@ export default function RecetasPage() {
   const [loading, setLoading] = useState(true);
   const [modalAbierto, setModalAbierto] = useState(false);
 
+  // Farmacias y usuario
+  const [farmacias, setFarmacias] = useState<any[]>([]);
+  const [farmaciaSeleccionada, setFarmaciaSeleccionada] = useState<string>('');
+
   // Filtros de listado
   const [filtroTipo, setFiltroTipo] = useState('');
   const [filtroFuente, setFiltroFuente] = useState('');
@@ -69,6 +74,21 @@ export default function RecetasPage() {
   const [errorForm, setErrorForm] = useState('');
   const [exitoMsg, setExitoMsg] = useState('');
 
+  // Cargar farmacias disponibles
+  useEffect(() => {
+    fetch('/api/farmacias')
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setFarmacias(data);
+          if (!farmaciaSeleccionada) {
+            setFarmaciaSeleccionada(data[0].id);
+          }
+        }
+      })
+      .catch(console.error);
+  }, []);
+
   // Cargar lista de recetas
   const cargarRecetas = async () => {
     try {
@@ -76,6 +96,7 @@ export default function RecetasPage() {
       const params = new URLSearchParams();
       if (filtroTipo) params.append('tipoAtencion', filtroTipo);
       if (filtroFuente) params.append('fuente', filtroFuente);
+      if (farmaciaSeleccionada) params.append('farmaciaId', farmaciaSeleccionada);
 
       const res = await fetch(`/api/recetas?${params.toString()}`);
       if (res.ok) {
@@ -91,7 +112,24 @@ export default function RecetasPage() {
 
   useEffect(() => {
     cargarRecetas();
-  }, [filtroTipo, filtroFuente]);
+  }, [filtroTipo, filtroFuente, farmaciaSeleccionada]);
+
+  // Cargar catálogo de medicamentos cuando cambia la farmacia o abre el modal
+  const cargarMedicamentos = (fId?: string) => {
+    const id = fId || farmaciaSeleccionada;
+    const url = id ? `/api/medicamentos?farmaciaId=${id}` : '/api/medicamentos';
+    fetch(url)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setCatalogoMedicamentos(data);
+          if (data.length > 0) {
+            setItems((prev) => (prev.length === 0 ? [{ medicamentoId: data[0].id, cantidad: 1 }] : prev));
+          }
+        }
+      })
+      .catch(console.error);
+  };
 
   // Cargar pacientes vigentes y catálogo de medicamentos para el modal
   useEffect(() => {
@@ -101,12 +139,9 @@ export default function RecetasPage() {
         .then((data) => setPacientesVigentes(data))
         .catch(console.error);
 
-      fetch('/api/medicamentos')
-        .then((r) => r.json())
-        .then((data) => setCatalogoMedicamentos(data))
-        .catch(console.error);
+      cargarMedicamentos(farmaciaSeleccionada);
     }
-  }, [modalAbierto]);
+  }, [modalAbierto, farmaciaSeleccionada]);
 
   const agregarItem = () => {
     if (catalogoMedicamentos.length > 0) {
@@ -157,6 +192,7 @@ export default function RecetasPage() {
 
     try {
       const payload = {
+        farmaciaId: farmaciaSeleccionada,
         personaId: pacienteSeleccionado.id,
         tipoAtencion,
         periodoInicio: tipoAtencion !== 'INTERNACION' ? periodoInicio : null,
@@ -210,7 +246,7 @@ export default function RecetasPage() {
             setModalAbierto(true);
             setErrorForm('');
             setExitoMsg('');
-            if (items.length === 0) agregarItem();
+            cargarMedicamentos();
           }}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm shadow-lg shadow-emerald-600/20 transition cursor-pointer"
         >
@@ -232,6 +268,23 @@ export default function RecetasPage() {
           <span className="text-xs font-semibold uppercase text-slate-400 flex items-center gap-1.5">
             <Filter className="w-3.5 h-3.5 text-emerald-400" /> Filtrar por:
           </span>
+
+          {farmacias.length > 1 && (
+            <select
+              value={farmaciaSeleccionada}
+              onChange={(e) => {
+                setFarmaciaSeleccionada(e.target.value);
+                cargarMedicamentos(e.target.value);
+              }}
+              className="bg-slate-800 border border-slate-700 text-emerald-300 text-xs rounded-lg px-3 py-2 font-medium"
+            >
+              {farmacias.map((f) => (
+                <option key={f.id} value={f.id}>
+                  🏥 {f.nombre} ({f.departamento})
+                </option>
+              ))}
+            </select>
+          )}
 
           <select
             value={filtroTipo}
@@ -269,6 +322,7 @@ export default function RecetasPage() {
               <tr>
                 <th className="px-5 py-3.5">N° Receta</th>
                 <th className="px-5 py-3.5">Fecha</th>
+                <th className="px-5 py-3.5">Farmacia Sede</th>
                 <th className="px-5 py-3.5">Paciente Beneficiario</th>
                 <th className="px-5 py-3.5">Atención</th>
                 <th className="px-5 py-3.5">Fuente</th>
@@ -279,13 +333,13 @@ export default function RecetasPage() {
             <tbody className="divide-y divide-slate-800/60">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-10 text-slate-500">
+                  <td colSpan={8} className="text-center py-10 text-slate-500">
                     Cargando recetas...
                   </td>
                 </tr>
               ) : recetas.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-slate-500">
+                  <td colSpan={8} className="text-center py-12 text-slate-500">
                     No se encontraron recetas emitidas con los filtros seleccionados.
                   </td>
                 </tr>
@@ -297,6 +351,10 @@ export default function RecetasPage() {
                     </td>
                     <td className="px-5 py-3.5 text-xs text-slate-400 whitespace-nowrap">
                       {new Date(r.fecha).toLocaleDateString('es-BO')}
+                    </td>
+                    <td className="px-5 py-3.5 text-xs text-slate-300">
+                      <div className="font-medium text-white">{r.farmacia?.nombre}</div>
+                      <div className="text-[11px] text-slate-400">{r.farmacia?.departamento}</div>
                     </td>
                     <td className="px-5 py-3.5">
                       <div className="font-medium text-white">{r.persona.nombreCompleto}</div>
@@ -356,19 +414,42 @@ export default function RecetasPage() {
               </h2>
               <button
                 onClick={() => setModalAbierto(false)}
-                className="text-slate-400 hover:text-white text-lg font-bold"
+                className="text-slate-400 hover:text-white text-lg font-bold cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleCrearReceta} className="p-6 space-y-6">
+            <form onSubmit={handleCrearReceta} className="p-6 space-y-5">
               {errorForm && (
                 <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm flex items-start gap-2">
                   <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
                   <div>
                     <span className="font-bold">Alerta Clínica:</span> {errorForm}
                   </div>
+                </div>
+              )}
+
+              {/* Selector de Farmacia Sede (Para Admin) */}
+              {farmacias.length > 1 && (
+                <div className="p-3 rounded-xl bg-slate-800/40 border border-slate-800 flex items-center justify-between">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                    <Building2 className="w-4 h-4 text-emerald-400" /> Farmacia Emisora:
+                  </label>
+                  <select
+                    value={farmaciaSeleccionada}
+                    onChange={(e) => {
+                      setFarmaciaSeleccionada(e.target.value);
+                      cargarMedicamentos(e.target.value);
+                    }}
+                    className="bg-slate-900 border border-slate-700 text-white text-xs rounded-lg px-3 py-1.5"
+                  >
+                    {farmacias.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.nombre} ({f.departamento})
+                      </option>
+                    ))}
+                  </select>
                 </div>
               )}
 
@@ -519,56 +600,62 @@ export default function RecetasPage() {
                   </button>
                 </div>
 
-                <div className="space-y-2">
-                  {items.map((it, idx) => {
-                    const medSel = catalogoMedicamentos.find((m) => m.id === it.medicamentoId);
-                    return (
-                      <div
-                        key={idx}
-                        className="p-3 rounded-lg bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center gap-3"
-                      >
-                        <div className="flex-1 w-full">
-                          <select
-                            value={it.medicamentoId}
-                            onChange={(e) => actualizarItem(idx, 'medicamentoId', e.target.value)}
-                            className="w-full bg-slate-800 border border-slate-700 text-white text-xs rounded-lg p-2 focus:ring-1 focus:ring-emerald-500"
-                          >
-                            {catalogoMedicamentos.map((m) => (
-                              <option key={m.id} value={m.id}>
-                                {m.nombreGenerico} [{m.nombreComercial}] - {m.concentracion} ({m.presentacion}) - Liname: {m.codigoLiname} | Fuente: {m.fuenteFinanciamiento} | Bs. {Number(m.costoUnitario).toFixed(2)}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs text-slate-400">Cant:</span>
-                            <input
-                              type="number"
-                              min={1}
-                              value={it.cantidad}
-                              onChange={(e) => actualizarItem(idx, 'cantidad', parseInt(e.target.value) || 1)}
-                              className="w-16 bg-slate-800 border border-slate-700 text-white text-xs rounded-lg p-2 text-center"
-                            />
+                {catalogoMedicamentos.length === 0 ? (
+                  <div className="p-4 rounded-lg bg-slate-950 text-center text-xs text-slate-400">
+                    Cargando medicamentos disponibles...
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {items.map((it, idx) => {
+                      const medSel = catalogoMedicamentos.find((m) => m.id === it.medicamentoId);
+                      return (
+                        <div
+                          key={idx}
+                          className="p-3 rounded-lg bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center gap-3"
+                        >
+                          <div className="flex-1 w-full">
+                            <select
+                              value={it.medicamentoId}
+                              onChange={(e) => actualizarItem(idx, 'medicamentoId', e.target.value)}
+                              className="w-full bg-slate-800 border border-slate-700 text-white text-xs rounded-lg p-2 focus:ring-1 focus:ring-emerald-500"
+                            >
+                              {catalogoMedicamentos.map((m) => (
+                                <option key={m.id} value={m.id}>
+                                  {m.nombreGenerico} [{m.nombreComercial}] - {m.concentracion} ({m.presentacion}) - Liname: {m.codigoLiname} | Fuente: {m.fuenteFinanciamiento} | Bs. {Number(m.costoUnitario).toFixed(2)}
+                                </option>
+                              ))}
+                            </select>
                           </div>
 
-                          <div className="text-xs font-mono font-bold text-white whitespace-nowrap">
-                            Bs. {medSel ? (Number(medSel.costoUnitario) * (it.cantidad || 0)).toFixed(2) : '0.00'}
-                          </div>
+                          <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs text-slate-400">Cant:</span>
+                              <input
+                                type="number"
+                                min={1}
+                                value={it.cantidad}
+                                onChange={(e) => actualizarItem(idx, 'cantidad', parseInt(e.target.value) || 1)}
+                                className="w-16 bg-slate-800 border border-slate-700 text-white text-xs rounded-lg p-2 text-center"
+                              />
+                            </div>
 
-                          <button
-                            type="button"
-                            onClick={() => eliminarItem(idx)}
-                            className="text-slate-500 hover:text-rose-400 transition"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                            <div className="text-xs font-mono font-bold text-white whitespace-nowrap">
+                              Bs. {medSel ? (Number(medSel.costoUnitario) * (it.cantidad || 0)).toFixed(2) : '0.00'}
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => eliminarItem(idx)}
+                              className="text-slate-500 hover:text-rose-400 transition cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
 
                 <div className="pt-2 flex justify-between items-center text-sm border-t border-slate-800">
                   <span className="text-slate-400">Costo Total Estimado:</span>
