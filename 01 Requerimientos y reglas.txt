@@ -1,0 +1,34 @@
+1. Tecnologia, utilizaremos mongodb o mysqlserver o posgress para la base de datos, un proyecto en nodejs para el backend y react para el front end.
+2. La aplicacion se desplegara en el servicio VERCEL u otro que me sugieras, la idea seria no pagar por el uso de red, ya que es un proyecto de prueba.
+3. Flujo
+   Se tienen varias farmacias, cada una tienen un diferente descripcion para el medicamento: nombre generico, nombre comercial, codigo Liname, concentración, presentación, costo unitario y fuente de financiamiento (F1, F2), codigoMedicamento.
+   
+   Cada farmacia tiene usuarios que ingresan al sistema pero solo deben acceder a su respectiva farmacia.
+   Se tiene una base de población habilitada para recibir medicamentos: Nombre, matricula, vigencia (si/no), sexo, fecha de nacimiento, codigoPersona, de manera que al momento de registrar la receta solo se despliega a las personas vigentes.
+   
+   La recetra se registra con los siguientes datos: fecha, farmacia, medicamentos, usuario que registra, detalle de medicamentos: medicamento, cantidad
+   Existen los siguientes tipos de recetas:
+   * Las que forman parte de la atención de consulta externa/odontología/emergencia: que corresponden a un periodo de tiempo ejemplo 1/1/2026 a 31/1/2026
+   * Las que forman parte de una internación, en este caso solo corresponden a una persona y todas tienen que ver con la internación.
+   
+   REportes: 
+   * Losreportes de atención de consulta externa/odontología/emergencia corresponden a un periodo ej 1/1/2026 a 31/1/2026 y muestran el listado de recetas emitidas en ese periodo agrupadas por consulta externa/odontología/emergencia, existe uno para la fuente de financiamiento F1 y otro para la fuente de Financiamiento F2, que tiene la fecha, nombre del paciente, matricula, detalle de medicamentos: nombre generico, nombre comercial, codigo Liname, concentración, presentación, cantidad, costo unitario y costo total.
+   * Los reportes de internación tienen la misma estructura del anterior sólo que corresponden sólo a un paciente.
+   Los reportes deben poder imprimirse, exportarse a pdf y a Excel.
+
+   * Integración, la farmacia con sus medicamentos y los pacientes viene de otro sistema donde cada medicamento tienen asignado un codigoMedicamento y codigoPersona. es así que se debe tener un reporte para exportar a Excel y cargar en el otro sistema inicialemente.
+
+   Cantidad: se espera registrar 4000 recetas al año y son 15 farmacias ubicadas en los departamentos de Bolivia, son alrededor de 4500 personas que pueden recibir recetas.
+---------------------------------------------------
+Quisiera desarrollar el proyecto con las siguietnes buenas practicas de informática:
+1. Utilizar Github para el versionado del proyecto, desarrollar ramas y ambientes de pruebas
+2. Una vez que tengamos una versión inicial desarrollar las fases de desarrollo continuo e integración continua.
+3. TEner un enfoque de seguiridad con pruebas automáticas.
+4. Innovación sugerir nuevas ideas o características al producto.
+5. Usabilidad, que el producto sea ácil de usar, ej web con diseño responsible
+
+Quisiera que me acompañes en el proceso de desarrollo y si es necesario congurar agentes en este medio los nombres con un titulo representativo: ej. Encaargado de pruebas.
+
+Estoy abierto a sugerencias y comencemos el proyecto.
+
+	

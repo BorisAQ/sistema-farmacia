@@ -1,0 +1,162 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum RolUsuario {
+  ADMIN_CENTRAL
+  ENCARGADO_FARMACIA
+  FARMACEUTICO
+  CONSULTA
+}
+
+enum Sexo {
+  M
+  F
+}
+
+enum FuenteFinanciamiento {
+  F1
+  F2
+}
+
+enum TipoAtencion {
+  CONSULTA_EXTERNA
+  ODONTOLOGIA
+  EMERGENCIA
+  INTERNACION
+}
+
+enum EstadoReceta {
+  EMITIDA
+  DISPENSADA
+  ANULADA
+}
+
+model Farmacia {
+  id              String        @id @default(cuid())
+  codigoFarmacia  String        @unique // Ej: LPZ-01, SCZ-01
+  nombre          String
+  departamento    String        // La Paz, Santa Cruz, Cochabamba, Oruro, etc.
+  direccion       String?
+  telefono        String?
+  activo          Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  usuarios        Usuario[]
+  medicamentos    Medicamento[]
+  recetas         Receta[]
+}
+
+model Usuario {
+  id              String        @id @default(cuid())
+  username        String        @unique
+  email           String        @unique
+  passwordHash    String
+  nombreCompleto  String
+  rol             RolUsuario    @default(FARMACEUTICO)
+  activo          Boolean       @default(true)
+  farmaciaId      String?       // Opcional para ADMIN_CENTRAL, obligatorio para personal de farmacia
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  farmacia        Farmacia?     @relation(fields: [farmaciaId], references: [id])
+  recetas         Receta[]
+}
+
+model Persona {
+  id              String        @id @default(cuid())
+  codigoPersona   String        @unique // Identificador del sistema externo
+  matricula       String        @unique // Matrícula de seguro/afiliación
+  nombreCompleto  String
+  sexo            Sexo
+  fechaNacimiento DateTime
+  vigente         Boolean       @default(true) // Solo las vigentes pueden recibir recetas
+  observaciones   String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  recetas         Receta[]
+
+  @@index([vigente])
+  @@index([matricula])
+  @@index([codigoPersona])
+}
+
+model Medicamento {
+  id                   String               @id @default(cuid())
+  farmaciaId           String               // Cada farmacia gestiona su catálogo/descripción
+  codigoMedicamento    String               // Código asignado por el sistema externo
+  codigoLiname         String               // Código Liname (Lista Nacional de Medicamentos Esenciales)
+  nombreGenerico       String
+  nombreComercial      String
+  concentracion        String               // Ej: 500 mg, 1 g, 250 mg/5ml
+  presentacion         String               // Ej: Comprimido, Jarabe, Ampolla
+  costoUnitario        Decimal              @default(0.00) @db.Decimal(10, 2)
+  fuenteFinanciamiento FuenteFinanciamiento // F1 o F2
+  stockActual          Int                  @default(0)
+  activo               Boolean              @default(true)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  farmacia             Farmacia             @relation(fields: [farmaciaId], references: [id])
+  detallesReceta       DetalleReceta[]
+
+  @@unique([farmaciaId, codigoMedicamento])
+  @@index([codigoLiname])
+  @@index([farmaciaId])
+  @@index([fuenteFinanciamiento])
+}
+
+model Receta {
+  id                   String               @id @default(cuid())
+  numeroReceta         String               // Código consecutivo o correlativo por farmacia
+  fecha                DateTime             @default(now())
+  farmaciaId           String
+  usuarioId            String               // Usuario responsable que registra
+  personaId            String               // Paciente receptor
+  tipoAtencion         TipoAtencion         // CONSULTA_EXTERNA, ODONTOLOGIA, EMERGENCIA, INTERNACION
+  periodoInicio        DateTime?            // Para consultas/atenciones ej. 01/01/2026
+  periodoFin           DateTime?            // Para consultas/atenciones ej. 31/01/2026
+  salaCamaInternacion  String?              // Datos de internación si aplica
+  fuenteFinanciamiento FuenteFinanciamiento // Predominante o de la atención (F1 o F2)
+  estado               EstadoReceta         @default(DISPENSADA)
+  observaciones        String?
+  costoTotalReceta     Decimal              @default(0.00) @db.Decimal(10, 2)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  farmacia             Farmacia             @relation(fields: [farmaciaId], references: [id])
+  usuario              Usuario              @relation(fields: [usuarioId], references: [id])
+  persona              Persona              @relation(fields: [personaId], references: [id])
+  detalles             DetalleReceta[]
+
+  @@unique([farmaciaId, numeroReceta])
+  @@index([farmaciaId])
+  @@index([personaId])
+  @@index([tipoAtencion])
+  @@index([fecha])
+  @@index([fuenteFinanciamiento])
+}
+
+model DetalleReceta {
+  id                   String               @id @default(cuid())
+  recetaId             String
+  medicamentoId        String
+  cantidad             Int
+  costoUnitario        Decimal              @db.Decimal(10, 2) // Congelado al momento de emisión
+  costoTotal           Decimal              @db.Decimal(10, 2) // cantidad * costoUnitario
+  fuenteFinanciamiento FuenteFinanciamiento // F1 o F2 congelado
+  createdAt            DateTime             @default(now())
+
+  receta               Receta               @relation(fields: [recetaId], references: [id], onDelete: Cascade)
+  medicamento          Medicamento          @relation(fields: [medicamentoId], references: [id])
+
+  @@index([recetaId])
+  @@index([medicamentoId])
+}
